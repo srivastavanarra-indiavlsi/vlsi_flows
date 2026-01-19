@@ -1,0 +1,121 @@
+project_root/
+├── scripts/
+│   ├── floorplan_main.tcl           # Main orchestration script
+│   ├── design_config.tcl            # Design parameters and variables
+│   ├── path_config.tcl              # All file paths and directories
+│   ├── pin_placement.tcl            # Pin placement module
+│   ├── macro_placement.tcl          # Macro placement and regioning module
+│   └── power_grid.tcl               # Power grid creation module
+│
+├── netlist/
+│   └── my_design_synth.v            # Synthesized gate-level netlist
+│
+├── constraints/
+│   ├── my_design.sdc                # Main timing constraints
+│   ├── my_design_floorplan.sdc      # Floorplan-specific constraints
+│   └── ...                          # Other SDC files
+│
+├── tech/
+│   ├── tech.lef                     # Technology LEF (layers, vias, rules)
+│   ├── stdcells.lef                 # Standard cell library LEF
+│   ├── io.lef                       # IO pad library LEF
+│   └── macros.lef                   # List of macro LEF files
+│
+├── lib/
+│   ├── stdcells_fast.lib            # Fast corner timing library
+│   ├── stdcells_slow.lib            # Slow corner timing library
+│   ├── stdcells_typ.lib             # Typical corner timing library
+│   └── ...                          # Other .lib files
+│
+├── def/
+│   ├── my_design_pins.def           # Pin locations (optional - for import)
+│   └── my_design_macros.def         # Macro placements (optional - for import)
+│
+├── reports/                         # Generated reports (auto-created)
+├── results/                         # Output files (auto-created)
+└── logs/                            # Log files (auto-created)
+
+File Descriptions
+Configuration Files
+1. design_config.tcl
+Contains all design-specific parameters:
+
+Design name and top module
+Technology node
+Floorplan parameters (utilization, aspect ratio)
+Power/ground net names
+Pin placement parameters
+Macro placement parameters
+Power grid parameters
+Timing parameters
+Placement and routing parameters
+
+2. path_config.tcl
+Contains all file paths and directories:
+
+Project root directory
+Input directories (netlist, constraints, tech, def, lib)
+Output directories (reports, results, logs)
+Netlist file paths
+SDC file paths
+LEF file paths
+Timing library paths
+DEF file paths
+Subscript paths
+Output file paths
+Path verification function
+
+Main Script
+3. floorplan_main.tcl
+Main orchestration script that:
+
+Loads configuration files (design_config.tcl, path_config.tcl)
+Verifies critical files exist
+Creates output directories
+Loads technology files and libraries
+Reads synthesized netlist
+Reads timing constraints (SDC)
+Initializes floorplan
+Calls pin placement script
+Calls macro placement script
+Calls power grid script
+Creates placement and routing blockages
+Generates reports
+Saves floorplan (DEF and database)
+Runs final checks
+
+Module Scripts
+4. pin_placement.tcl
+Handles pin placement:
+
+Imports pins from DEF or auto-places them
+Configures pin layers and spacing
+Handles pin grouping and side constraints
+Verifies pin placement
+Generates pin reports
+
+5. macro_placement.tcl
+Handles macro placement and regioning:
+
+Gets list of hard macros
+Imports or auto-places macros
+Creates regions for hierarchical placement
+Sets macro orientations
+Creates halos/keepout zones around macros
+Verifies macro placement
+Generates macro reports
+
+6. power_grid.tcl
+Creates power distribution network:
+
+Creates power rings around core and macros
+Creates power stripes on multiple metal layers (M1, M4, M7)
+Connects all layers with vias
+Connects macros to power grid
+Verifies power grid connectivity
+Performs power grid analysis
+Generates power grid reports
+
+Usage
+Basic Usage
+
