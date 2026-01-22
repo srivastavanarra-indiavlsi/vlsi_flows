@@ -1,0 +1,393 @@
+#####
+# SPEF Extraction Control Variables - Comprehensive Guide
+
+## 1. CORE EXTRACTION MODE VARIABLES
+
+### `EXTRACT_COUPLING` (0 or 1)
+**Purpose:** Controls whether coupling capacitances between adjacent nets are extracted
+
+**Impact:**
+- **Value = 1:** Extracts coupling caps between neighboring wires (CC caps)
+  - More accurate timing analysis
+  - Captures crosstalk effects
+  - Longer extraction runtime
+  - Larger SPEF file size
+- **Value = 0:** Only extracts ground capacitances
+  - Faster extraction
+  - Smaller files
+  - Less accurate for closely spaced nets
+
+**Recommendation:** Always use `1` for critical paths, clock networks, and tapeout. Use `0` only for early exploration.
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -coupled 1
+```
+
+---
+
+### `COUPLING_THRESHOLD` (in pF)
+**Purpose:** Minimum coupling capacitance value to include in SPEF
+
+**Impact:**
+- **Lower threshold (0.001 - 0.05 pF):**
+  - Captures more coupling effects
+  - More accurate but noisier results
+  - Much larger SPEF files
+  - Slower STA runtime
+- **Higher threshold (0.1 - 1.0 pF):**
+  - Filters out negligible coupling
+  - Smaller, cleaner SPEF files
+  - Faster downstream tools
+  - May miss some crosstalk
+
+**Typical Values:**
+- Critical designs: 0.01 - 0.05 pF
+- Standard designs: 0.05 - 0.1 pF
+- Quick analysis: 0.1 - 0.5 pF
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -ccThreshold 0.05
+```
+
+---
+
+### `RES_THRESHOLD` (in ohms)
+**Purpose:** Minimum resistance value to include in SPEF
+
+**Impact:**
+- **Lower threshold (0.001 - 0.01 Ω):**
+  - Extracts more resistive segments
+  - Better IR drop analysis
+  - Larger SPEF, more RC nodes
+- **Higher threshold (0.1 - 1.0 Ω):**
+  - Filters negligible resistances
+  - Reduced parasitic network
+  - Faster analysis
+
+**Typical Values:**
+- Power/Ground nets: 0.001 - 0.01 Ω
+- Signal nets: 0.01 - 0.1 Ω
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -resThreshold 0.01
+```
+
+---
+
+## 2. RESISTANCE EXTRACTION CONTROL
+
+### `EXTRACT_RES_MODEL` (detailed, reduced, none)
+**Purpose:** Controls how resistances are modeled in the parasitic network
+
+**Options:**
+
+#### **detailed**
+- Creates distributed RC network with multiple R segments
+- Most accurate for long interconnects
+- Captures skin effect, frequency dependence
+- Large SPEF files with many internal nodes
+- Best for: Clock trees, long buses, high-frequency signals
+
+#### **reduced**
+- Lumps resistances into fewer segments
+- Pi-model or T-model representation
+- Smaller SPEF, faster STA
+- Good accuracy for typical nets
+- Best for: Standard signal nets
+
+#### **none**
+- No resistance extraction (C-only)
+- Fastest extraction
+- Only for very short nets or early exploration
+- Not recommended for tapeout
+
+**QRC Commands:**
+```tcl
+qrcSetExtractorMode -resMode detail      ;# detailed
+qrcSetExtractorMode -resMode reduce      ;# reduced
+qrcSetExtractorMode -resMode none        ;# none
+```
+
+---
+
+## 3. CAPACITANCE EXTRACTION CONTROL
+
+### `EXTRACT_CAP_MODEL` (detailed, reduced)
+**Purpose:** Controls capacitance calculation accuracy
+
+**Options:**
+
+#### **detailed**
+- 3D field solver for accurate cap calculation
+- Considers fringing fields, nearby geometries
+- Slower extraction
+- Higher accuracy (±5%)
+
+#### **reduced**
+- 2.5D or pattern-based cap calculation
+- Faster extraction
+- Good accuracy (±10-15%)
+
+**QRC Commands:**
+```tcl
+qrcSetExtractorMode -capMode detail
+qrcSetExtractorMode -capMode reduce
+```
+
+---
+
+## 4. SPEF OUTPUT FORMAT CONTROL
+
+### `INCLUDE_LOCATION_INFO` (0 or 1)
+**Purpose:** Adds X,Y coordinates to parasitic nodes in SPEF
+
+**Impact:**
+- **Value = 1:** Includes *C coordinates in SPEF
+  ```spef
+  *C 125.4 net1:1 *C 245.8 125.4 0.015
+  ```
+  - Enables visual debugging
+  - Helps correlate with layout
+  - Larger SPEF files (~10-20% bigger)
+- **Value = 0:** Omits coordinates
+  - Smaller files
+  - Faster file I/O
+  - No visual correlation
+
+**QRC Commands:**
+```tcl
+qrcSetOutputMode -includeCoordinates 1
+qrcSetOutputMode -coordinateFormat absolute  ;# or relative
+```
+
+---
+
+### `SPEF_NET_DELIMITER` (character)
+**Purpose:** Separator character for hierarchical net names
+
+**Impact:**
+```tcl
+# With delimiter = "/"
+cpu/alu/adder/sum[0]
+
+# With delimiter = "."
+cpu.alu.adder.sum[0]
+```
+
+**QRC Command:**
+```tcl
+qrcSetOutputMode -spefNetNameDelimiter "/"
+```
+
+---
+
+### `SPEF_PORT_NAME_MAP` (physical, logical)
+**Purpose:** How to map port names in SPEF
+
+**Options:**
+- **physical:** Use actual pin names from layout (M1, M2, etc.)
+- **logical:** Use logical signal names from netlist (CLK, DATA, etc.)
+
+**QRC Command:**
+```tcl
+qrcSetOutputMode -spefPortNameMap physical
+```
+
+---
+
+## 5. CORNER AND ENVIRONMENT VARIABLES
+
+### `TEMPERATURE` (in Celsius)
+**Purpose:** Operating temperature for resistance/capacitance calculation
+
+**Impact:**
+- Higher temp → Higher resistance (positive temp coefficient)
+- Higher temp → Slightly lower capacitance
+- Typical corners: -40°C, 25°C, 125°C
+
+**Example Temperature Effects (Copper):**
+- -40°C: R decreases by ~20%
+- 25°C: Nominal R
+- 125°C: R increases by ~35%
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -temperature 125
+```
+
+---
+
+### `PROCESS_CORNER` (TT, FF, SS, etc.)
+**Purpose:** Process variation corner
+
+**Common Corners:**
+- **TT (Typical-Typical):** Nominal process
+- **FF (Fast-Fast):** Thin oxide, low resistance
+- **SS (Slow-Slow):** Thick oxide, high resistance
+- **FS, SF:** Mixed corners
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -process SS
+qrcSetExtractorMode -corner slow
+```
+
+---
+
+## 6. ADVANCED EXTRACTION CONTROL
+
+### `EXTRACT_CC_GROUND` (0 or 1)
+**Purpose:** Include coupling to ground/power nets
+
+**Impact:**
+- **Value = 1:** Extracts caps between signal and ground
+  - More complete model
+  - Important for shielded structures
+- **Value = 0:** Skip signal-to-ground coupling
+  - Faster extraction
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -ccToGround 1
+```
+
+---
+
+### `MAX_FRACTURE_LENGTH` (in microns)
+**Purpose:** Maximum length of wire segment before splitting
+
+**Impact:**
+- **Smaller values (100-500 µm):**
+  - More accurate distributed RC
+  - More internal nodes
+  - Larger SPEF
+- **Larger values (1000-5000 µm):**
+  - Fewer segments
+  - Less accurate for long nets
+  - Smaller SPEF
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -maxFractureLength 1000
+```
+
+---
+
+### `REDUCTION_MODE` (none, normal, aggressive)
+**Purpose:** Post-extraction parasitic reduction
+
+**Options:**
+- **none:** No reduction, keep all parasitics
+- **normal:** Merge small R/C values
+- **aggressive:** Aggressive reduction for smaller SPEF
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -reductionMode normal
+```
+
+---
+
+## 7. SPEF CONTENT CONTROL
+
+### `SPEF_PARASITIC_TYPE` (detailed, reduced)
+**Purpose:** Level of detail in parasitic representation
+
+**Options:**
+- **detailed:** Full RC network with all nodes
+- **reduced:** Simplified pi-models
+
+**QRC Command:**
+```tcl
+qrcSetOutputMode -spefParasiticType detailed
+```
+
+---
+
+### `INCLUDE_GROUND_CAPS` (0 or 1)
+**Purpose:** Include total ground capacitance in SPEF
+
+**Impact:**
+- Always needed for accurate timing
+- Shows total cap to ground per node
+
+---
+
+## 8. PERFORMANCE VARIABLES
+
+### `NUM_THREADS` (integer)
+**Purpose:** Number of parallel CPU threads for extraction
+
+**Impact:**
+- More threads = faster extraction
+- Diminishing returns beyond 16-32 threads
+- Memory usage increases linearly
+
+**QRC Command:**
+```tcl
+qrcSetExtractorMode -numThreads 16
+```
+
+---
+
+## RECOMMENDED SETTINGS BY USE CASE
+
+### **Tapeout / Final Timing:**
+```tcl
+set EXTRACT_COUPLING 1
+set COUPLING_THRESHOLD 0.01
+set RES_THRESHOLD 0.01
+set EXTRACT_RES_MODEL "detailed"
+set EXTRACT_CAP_MODEL "detailed"
+set INCLUDE_LOCATION_INFO 1
+set EXTRACT_CC_GROUND 1
+```
+
+### **Standard STA Flow:**
+```tcl
+set EXTRACT_COUPLING 1
+set COUPLING_THRESHOLD 0.05
+set RES_THRESHOLD 0.05
+set EXTRACT_RES_MODEL "reduced"
+set EXTRACT_CAP_MODEL "detailed"
+set INCLUDE_LOCATION_INFO 0
+set EXTRACT_CC_GROUND 1
+```
+
+### **Fast/Exploratory Analysis:**
+```tcl
+set EXTRACT_COUPLING 1
+set COUPLING_THRESHOLD 0.1
+set RES_THRESHOLD 0.1
+set EXTRACT_RES_MODEL "reduced"
+set EXTRACT_CAP_MODEL "reduced"
+set INCLUDE_LOCATION_INFO 0
+set EXTRACT_CC_GROUND 0
+```
+
+---
+
+## SPEF FILE SIZE IMPACT
+
+| Setting | SPEF Size Impact |
+|---------|------------------|
+| Coupling ON vs OFF | 3-5x larger |
+| Lower threshold (0.01 vs 0.1) | 2-3x larger |
+| Detailed vs Reduced R | 2-4x larger |
+| Location info ON | +10-20% |
+| More corners | Linear (+1x per corner) |
+
+---
+
+## EXTRACTION RUNTIME IMPACT
+
+| Setting | Runtime Impact |
+|---------|----------------|
+| Coupling ON | 3-10x slower |
+| Detailed resistance | 2-3x slower |
+| Detailed capacitance | 1.5-2x slower |
+| Lower thresholds | 1.5-3x slower |
+| More threads | Near-linear speedup |
