@@ -30,7 +30,7 @@ puts "--- Starting LVS Verification Run ---"
 run_lvs_verification \
     -layout_file $INPUT_LAYOUT_GDS \
     -layout_top_cell $DESIGN_TOP_CELL \
-    -schematic_netlist_file $INPUT_SCHEMATIC_NETLIST 
+    -schematic_netlist_file $INPUT_SCHEMATIC_NETLIST \
     -rule_deck_file $LVS_RULE_DECK \
     -report_file $LVS_REPORT_FILE \
     -results_database $LVS_RESULTS_DB \

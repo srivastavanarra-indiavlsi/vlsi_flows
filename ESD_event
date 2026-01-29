@@ -1,5 +1,13 @@
 ######
-n a traditional RC-triggered ESD clamp, the waveforms at each node represent the circuit's ability to distinguish between a fast ESD event and a slow normal power-up
+During an ESD event (e.g., a positive surge on a pin):
+
+    The I/O diode clamps the pin voltage to VDD + ~0.7V.
+    Excess current flows through the diode to the VDD rail.
+    The power clamp on the VDD rail activates, diverting the current to the VSS (ground) rail, often through alternative, low-impedance paths within the chip.
+    This multi-layered approach effectively shunts the high-energy ESD pulse away from the sensitive core circuitry, protecting the chip
+
+######
+In a traditional RC-triggered ESD clamp, the waveforms at each node represent the circuit's ability to distinguish between a fast ESD event and a slow normal power-up
 . The typical behavior at key nodes during an ESD event (e.g., a 10 ns rise time pulse) is as follows: 
 
     VDD (Power Rail): Under an ESD event, the rail voltage rapidly spikes (e.g., to ~5V–6V for an HBM event). The clamp's goal is to keep this voltage below the gate-oxide breakdown limit of internal core transistors.
@@ -13,4 +21,73 @@ VDD Rail	Gradual rise to operating voltage.	Rapid transient spike.
 RC Node	  Follows VDD; capacitor has time to charge.	Remains low; capacitor cannot charge instantly.
 Gate Node	Remains low; Mclamp stays OFF.	Driven high; Mclamp turns ON.
 Current (I)	Minimal leakage (nA range).	High discharge current (Amperes).
-Traditional designs may suffer from oscillation if the VDD rail drops below the inverter trip point before the ESD energy is fully depleted, causing the Mclamp to prematurely turn off and then back on. Modern 2026 designs often replace the simple RC with feedback-enhanced or thyristor-delay elements to ensure the clamp stays on for the full duration (~1µs) of an HBM event regardless of rail fluctuations. 
+Traditional designs may suffer from oscillation if the VDD rail drops below the inverter trip point before the ESD energy is fully depleted, causing the Mclamp to prematurely turn off and then back on. Modern 2026 designs often replace the simple RC with feedback-enhanced or thyristor-delay elements to ensure the clamp stays on for the full duration (~1µs) of an HBM event regardless of rail fluctuations.
+
+#####
+#Need to find the least resistive path from HDM/CDM event so that it doesnt damage core circyuit
+#You can use below Path finder - ansys tool script
+#tcl
+
+# 1. Setup Design Environment
+# Load the design database (DEF/LEF or GDS/OASIS)
+open_design -design_file my_chip.def -lef_file tech.lef
+
+# 2. Define ESD Components
+# Identify cell types for diodes and clamps based on library naming
+set esd_diodes [get_cells -filter "ref_name =~ *ESD_DIODE*"]
+set power_clamps [get_cells -filter "ref_name =~ *ESD_CLAMP*"]
+
+# 3. Perform Placement Strategy Checks
+# Check if any I/O bump is too far from its assigned clamp
+perform esdcheck -rule placement_radius -radius 500 -clamp $power_clamps
+
+# 4. Path Resistance Analysis (HBM/CDM)
+# Calculate bump-to-clamp resistance for all signal pins
+# This identifies if the placement is 'right' by confirming low-impedance paths
+perform esdcheck -type path_resistance \
+                 -from [get_ports *] \
+                 -to $power_clamps \
+                 -max_res 1.5 \
+                 -report_file esd_path_res.rpt
+
+# 5. Current Density Check
+# Verify if the metal lines connecting the ESD cells can handle the zap current
+run_esd_simulation -event HBM -voltage 2000 -output_dir ./sim_results
+
+# 6. Report Violations
+# Extract instances where the ESD strategy failed (missing connections or high resistance)
+report_esd_violations -format text -out_file esd_violations.txt
+########
+#5nm design
+# 1. Initialize 5nm Project with SeaScape Architecture
+# PathFinder-SC handles 100M+ instances for ultra-large 5nm SoCs
+set_project_node 5nm
+import_design -def chip_top.def -lef tech_5nm.lef -lib foundry_esd_lib.lib
+
+# 2. Define High-Speed I/O and ESD Clamps
+# 5nm designs often use distributed clamps for high-speed SerDes pins
+set ios [get_ports -filter "direction == inout"]
+set clamps [get_cells -filter "ref_name =~ *ESD_CLAMP_5NM*"]
+
+# 3. Connectivity & Placement Rule Check
+# Checks if every bump has a valid discharge path to a power/ground rail
+perform esdcheck -type connectivity -from $ios -to $clamps -report connectivity.rpt
+
+# 4. 5nm-Specific P2P Resistance Analysis
+# Critical for 5nm: Verifying path resistance to ensure it stays in the narrow <3V window
+perform esdcheck -type path_resistance \
+                 -from $ios \
+                 -to $clamps \
+                 -max_res 0.8 \
+                 -net {VDD VSS} \
+                 -report path_res_5nm.rpt
+
+# 5. Current Density (CD) Simulation for HBM/CDM
+# Checks if 5nm metal interconnects can handle the zap current without failure
+run_esd_simulation -event HBM -voltage 2000 -out_dir ./hbm_results
+run_esd_simulation -event CDM -voltage 500  -out_dir ./cdm_results
+
+# 6. Analyze Results & Root Cause Detection
+# Use the GUI to cross-probe high-resistance bottlenecks directly to the layout
+report_esd_violations -out_file final_signoff.txt
+
